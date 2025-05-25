@@ -2,6 +2,8 @@
 
 A modular Python agent for acquiring, analyzing, and reporting on stock market data, news, and social sentiment.
 
+---
+
 ## Features
 - **Data Acquisition**: Fetches historical price data (Yahoo Finance), news (NewsAPI, RSS, Newspaper3k), and social media posts (Reddit, Twitter/X).
 - **Database**: Stores all data in a local SQLite database (`data/stock_market.db`).
