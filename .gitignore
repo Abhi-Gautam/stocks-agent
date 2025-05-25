@@ -60,3 +60,5 @@ coverage.xml
 # dotenv
 .env
 .env.*
+poetry.lock
+pyproject.toml
