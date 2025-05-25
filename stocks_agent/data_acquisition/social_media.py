@@ -1,5 +1,6 @@
 import datetime
 from datetime import timedelta
+from datetime import timezone
 import praw
 import re
 from tweepy import Client
@@ -44,39 +45,33 @@ def fetch_reddit_posts(subreddit: str, symbols: list[str], days_back: int = 1, l
 def init_twitter_client() -> Client:
     return Client(bearer_token=config.TWITTER_BEARER_TOKEN)
 
-def fetch_twitter_posts(days_back: int = 1, max_results: int = 100) -> list[dict]:
+def fetch_twitter_posts(symbols: list[str], days_back: int = 1, max_results: int = 5) -> list[dict]:
     """
-    Uses the TWITTER_QUERY from .env (e.g. "Indian stock market OR #IndianStockMarket OR NSE OR BSE")
-    to fetch recent tweets, then filters by our symbol list.
+    Fetch recent tweets matching TWITTER_QUERY, then filter by our symbol list.
     """
     client = init_twitter_client()
-    from datetime import timezone
-    # build the start time
-    start_time = (datetime.datetime.now(timezone.utc) - datetime.timedelta(days=days_back)).isoformat()
-    # read the overall query from env
-    query = config.TWITTER_QUERY
+    start_time = (
+        datetime.datetime.now(datetime.timezone.utc)
+        - datetime.timedelta(days=days_back)
+    ).isoformat()
 
     resp = client.search_recent_tweets(
-        query=query,
+        query=config.TWITTER_QUERY,
         start_time=start_time,
         max_results=max_results,
         tweet_fields=["created_at", "author_id", "text"]
     )
 
-    # load all known symbols from the DB
-    with SessionLocal() as session:
-        symbols = [row[0] for row in session.query(Stock.symbol).all()]
-    print(symbols);
     posts = []
     if resp.data:
         for t in resp.data:
-            text = t.text
-            for sym in symbols:
-                if re.search(rf"\b{re.escape(sym)}\b", text, flags=re.IGNORECASE):
+            text = t.text or ""
+            for symbol in symbols:
+                if symbol.lower() in text.lower():
                     posts.append({
                         "platform": "twitter",
                         "post_id": str(t.id),
-                        "symbol": sym,
+                        "symbol": symbol,
                         "author": t.author_id,
                         "text": text,
                         "created_at": t.created_at
@@ -86,7 +81,9 @@ def fetch_twitter_posts(days_back: int = 1, max_results: int = 100) -> list[dict
 def store_social_posts(items: list[dict]):
     with SessionLocal() as session:
         for item in items:
-            exists = session.query(SocialPost).filter_by(platform=item["platform"], post_id=item["post_id"]).first()
+            exists = session.query(SocialPost)\
+                            .filter_by(platform=item["platform"], post_id=item["post_id"])\
+                            .first()
             if exists:
                 continue
             post = SocialPost(
@@ -101,15 +98,15 @@ def store_social_posts(items: list[dict]):
         session.commit()
 
 def run_social_pipeline(symbols: list[str], days_back: int = 1):
-    reddit_posts = fetch_reddit_posts(config.REDDIT_SUBREDDIT, symbols, days_back)
-    twitter_posts = fetch_twitter_posts(days_back)
-    all_posts = reddit_posts + twitter_posts
+    reddit_posts  = fetch_reddit_posts(config.REDDIT_SUBREDDIT, symbols, days_back)
+    twitter_posts = fetch_twitter_posts(symbols, days_back)
+    all_posts     = reddit_posts + twitter_posts
     store_social_posts(all_posts)
 
 if __name__ == "__main__":
-    symbols = getattr(config, 'SOCIAL_SYMBOLS', None)
-    if not symbols:
-        keywords = getattr(config, 'NEWS_KEYWORDS', '')
-        symbols = [s.strip() for s in keywords.split(",") if s.strip()]
-    days_back = getattr(config, 'NEWS_DAYS_BACK', 1)
+    # load symbols (for now from NEWS_KEYWORDS; later from your master Stocks table)
+    keywords = getattr(config, 'NEWS_KEYWORDS', '')
+    symbols = [s.strip() for s in keywords.split(",") if s.strip()]
+
+    days_back = getattr(config, 'DAYS_BACK', 1)
     run_social_pipeline(symbols, days_back)
