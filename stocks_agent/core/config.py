@@ -11,7 +11,7 @@ class Config:
     NEWS_API_QUERY: str = os.getenv("NEWS_API_QUERY")
     NEWS_API_KEY: str = os.getenv("NEWS_API_KEY")
     RSS_FEEDS: list = None
-    NEWS_DAYS_BACK: int = int(os.getenv("NEWS_DAYS_BACK", 1))
+    DAYS_BACK: int = int(os.getenv("DAYS_BACK", 1))
     REDDIT_CLIENT_ID: str = os.getenv("REDDIT_CLIENT_ID")
     REDDIT_CLIENT_SECRET: str = os.getenv("REDDIT_CLIENT_SECRET")
     REDDIT_USER_AGENT: str = os.getenv("REDDIT_USER_AGENT")

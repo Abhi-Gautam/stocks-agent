@@ -98,5 +98,5 @@ def run_news_pipeline(days_back: int = 1):
     scrape_and_store_articles(raw_items)
 
 if __name__ == "__main__":
-    days = getattr(config, 'NEWS_DAYS_BACK', 1)
+    days = getattr(config, 'DAYS_BACK', 1)
     run_news_pipeline(days)

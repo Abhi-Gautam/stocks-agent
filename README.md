@@ -58,7 +58,6 @@ TWITTER_BEARER_TOKEN=your_bearer_token
 TWITTER_QUERY=stock OR market OR finance
 SOCIAL_SYMBOLS=AAPL,GOOGL,MSFT
 NEWS_KEYWORDS=stock,market,finance
-NEWS_DAYS_BACK=1
 DAYS_BACK=1
 ```
 
