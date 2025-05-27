@@ -16,12 +16,7 @@ class Config:
     REDDIT_CLIENT_SECRET: str = os.getenv("REDDIT_CLIENT_SECRET")
     REDDIT_USER_AGENT: str = os.getenv("REDDIT_USER_AGENT")
     REDDIT_SUBREDDIT: str = os.getenv("REDDIT_SUBREDDIT")
-    TWITTER_API_KEY: str = os.getenv("TWITTER_API_KEY")
-    TWITTER_API_SECRET: str = os.getenv("TWITTER_API_SECRET")
-    TWITTER_ACCESS_TOKEN: str = os.getenv("TWITTER_ACCESS_TOKEN")
-    TWITTER_ACCESS_SECRET: str = os.getenv("TWITTER_ACCESS_SECRET")
-    TWITTER_BEARER_TOKEN: str = os.getenv("TWITTER_BEARER_TOKEN")
-    TWITTER_QUERY: str = os.getenv("TWITTER_QUERY")
+    TWITTERAPI_IO_KEY: str = os.getenv("TWITTERAPI_IO_KEY")
     SOCIAL_SYMBOLS: list = None
     NEWS_KEYWORDS: str = os.getenv("NEWS_KEYWORDS")
 
@@ -47,14 +42,6 @@ class Config:
             missing.append("REDDIT_USER_AGENT")
         if not self.REDDIT_SUBREDDIT:
             missing.append("REDDIT_SUBREDDIT")
-        if not self.TWITTER_API_KEY:
-            missing.append("TWITTER_API_KEY")
-        if not self.TWITTER_API_SECRET:
-            missing.append("TWITTER_API_SECRET")
-        if not self.TWITTER_ACCESS_TOKEN:
-            missing.append("TWITTER_ACCESS_TOKEN")
-        if not self.TWITTER_ACCESS_SECRET:
-            missing.append("TWITTER_ACCESS_SECRET")
         social_symbols = os.getenv("SOCIAL_SYMBOLS")
         if social_symbols:
             self.SOCIAL_SYMBOLS = [s.strip() for s in social_symbols.split(",") if s.strip()]

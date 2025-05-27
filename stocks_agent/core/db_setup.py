@@ -51,7 +51,7 @@ class SocialPost(Base):
     id = Column(Integer, primary_key=True)
     platform = Column(String, nullable=False)
     post_id = Column(String, unique=True, nullable=False)
-    symbol = Column(String, nullable=False)
+    symbol = Column(String, nullable=True)
     author = Column(String, nullable=False)
     text = Column(Text, nullable=False)
     created_at = Column(DateTime, nullable=False)

@@ -1,12 +1,11 @@
 import datetime
-from datetime import timedelta
-from datetime import timezone
+from datetime import timedelta, timezone
 import praw
-import re
-from tweepy import Client
-from stocks_agent.core.db_setup import SessionLocal, SocialPost, Stock
+import requests
+from stocks_agent.core.db_setup import SessionLocal, SocialPost
 from stocks_agent.core.config import config
 import logging
+from dateutil import parser as date_parser
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -18,8 +17,7 @@ def init_reddit_client() -> praw.Reddit:
         user_agent=config.REDDIT_USER_AGENT
     )
 
-def fetch_reddit_posts(subreddit: str, symbols: list[str], days_back: int = 1, limit: int = 100) -> list[dict]:
-    from datetime import timezone
+def fetch_reddit_posts(subreddit: str, days_back: int = 1, limit: int = 100) -> list[dict]:
     since = int((datetime.datetime.now(timezone.utc) - timedelta(days=days_back)).timestamp())
     reddit = init_reddit_client()
     posts = []
@@ -28,54 +26,52 @@ def fetch_reddit_posts(subreddit: str, symbols: list[str], days_back: int = 1, l
             if submission.created_utc < since:
                 continue
             text = (submission.title or "") + "\n" + (submission.selftext or "")
-            for symbol in symbols:
-                if symbol.lower() in text.lower():
-                    posts.append({
-                        "platform": "reddit",
-                        "post_id": submission.id,
-                        "symbol": symbol,
-                        "author": getattr(submission.author, 'name', None),
-                        "text": text,
-                        "created_at": datetime.datetime.fromtimestamp(submission.created_utc, timezone.utc)
-                    })
+            posts.append({
+                "platform": "reddit",
+                "post_id": submission.id,
+                "symbol": None,  # To be filled later
+                "author": getattr(submission.author, 'name', None),
+                "text": text,
+                "created_at": datetime.datetime.fromtimestamp(submission.created_utc, timezone.utc)
+            })
     except Exception as e:
         logger.error(f"Reddit fetch error: {e}")
     return posts
 
-def init_twitter_client() -> Client:
-    return Client(bearer_token=config.TWITTER_BEARER_TOKEN)
-
-def fetch_twitter_posts(symbols: list[str], days_back: int = 1, max_results: int = 5) -> list[dict]:
-    """
-    Fetch recent tweets matching TWITTER_QUERY, then filter by our symbol list.
-    """
-    client = init_twitter_client()
-    start_time = (
-        datetime.datetime.now(datetime.timezone.utc)
-        - datetime.timedelta(days=days_back)
-    ).isoformat()
-
-    resp = client.search_recent_tweets(
-        query=config.TWITTER_QUERY,
-        start_time=start_time,
-        max_results=max_results,
-        tweet_fields=["created_at", "author_id", "text"]
-    )
-
+def fetch_twitter_posts(usernames: list[str]) -> list[dict]:
+    api_key = config.TWITTERAPI_IO_KEY
     posts = []
-    if resp.data:
-        for t in resp.data:
-            text = t.text or ""
-            for symbol in symbols:
-                if symbol.lower() in text.lower():
+    for username in usernames:
+        try:
+            resp = requests.get(
+                "https://api.twitterapi.io/twitter/user/last_tweets",
+                headers={"X-API-Key": api_key},
+                params={"userName": username}
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                tweets = data.get("data", {}).get("tweets", [])
+                for t in tweets:
+                    author_info = t.get("author", {})
                     posts.append({
                         "platform": "twitter",
-                        "post_id": str(t.id),
-                        "symbol": symbol,
-                        "author": t.author_id,
-                        "text": text,
-                        "created_at": t.created_at
+                        "post_id": str(t.get("id")),
+                        "symbol": None,  # To be filled later
+                        "author": author_info.get("userName", username),
+                        "text": t.get("text", ""),
+                        "created_at": date_parser.parse(t.get("createdAt")) if t.get("createdAt") else None,
+                        "url": t.get("url"),
+                        "retweet_count": t.get("retweetCount"),
+                        "reply_count": t.get("replyCount"),
+                        "like_count": t.get("likeCount"),
+                        "quote_count": t.get("quoteCount"),
+                        "view_count": t.get("viewCount"),
+                        "lang": t.get("lang"),
                     })
+            else:
+                logger.error(f"twitterAPI.io error for {username}: {resp.status_code} {resp.text}")
+        except Exception as e:
+            logger.error(f"twitterAPI.io fetch error for {username}: {e}")
     return posts
 
 def store_social_posts(items: list[dict]):
@@ -89,7 +85,7 @@ def store_social_posts(items: list[dict]):
             post = SocialPost(
                 platform=item["platform"],
                 post_id=item["post_id"],
-                symbol=item["symbol"],
+                symbol=item.get("symbol"),
                 author=item["author"],
                 text=item["text"],
                 created_at=item["created_at"]
@@ -97,16 +93,8 @@ def store_social_posts(items: list[dict]):
             session.add(post)
         session.commit()
 
-def run_social_pipeline(symbols: list[str], days_back: int = 1):
-    reddit_posts  = fetch_reddit_posts(config.REDDIT_SUBREDDIT, symbols, days_back)
-    twitter_posts = fetch_twitter_posts(symbols, days_back)
-    all_posts     = reddit_posts + twitter_posts
+def run_social_pipeline(usernames: list[str], days_back: int = 1):
+    # reddit_posts = fetch_reddit_posts(config.REDDIT_SUBREDDIT, days_back)
+    twitter_posts = fetch_twitter_posts(usernames)
+    all_posts = twitter_posts
     store_social_posts(all_posts)
-
-if __name__ == "__main__":
-    # load symbols (for now from NEWS_KEYWORDS; later from your master Stocks table)
-    keywords = getattr(config, 'NEWS_KEYWORDS', '')
-    symbols = [s.strip() for s in keywords.split(",") if s.strip()]
-
-    days_back = getattr(config, 'DAYS_BACK', 1)
-    run_social_pipeline(symbols, days_back)
